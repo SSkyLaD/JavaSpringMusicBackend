@@ -22,10 +22,6 @@ import java.util.List;
 @AllArgsConstructor
 public class User extends AppUser {
 
-    private double availableMemory = 1000;
-
-    private int sumOfSongs = 0;
-
     @OneToOne(cascade = CascadeType.ALL)
     private StorageList userStorageList = new StorageList();
 

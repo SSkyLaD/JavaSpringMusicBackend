@@ -9,8 +9,6 @@ public class UserMapper {
         userDto.setId(user.getId());
         userDto.setUsername(user.getUsername());
         userDto.setCreateDate(user.getCreateDate());
-        userDto.setAvailableMemory(user.getAvailableMemory());
-        userDto.setSumOfSongs(user.getSumOfSongs());
         return userDto;
     }
 

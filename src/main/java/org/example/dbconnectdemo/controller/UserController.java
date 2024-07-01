@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Date;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class UserController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             User user = userService.getUserData(username);
-            Data resData = new Data(user.getUsername(),user.getEmail(),user.getCreateDate(),user.getSumOfSongs(),user.getAvailableMemory());
+            Data resData = new Data(user.getUsername(),user.getEmail(),user.getCreateDate(),user.getUserStorageList().getSumOfSongs(), user.getUserStorageList().getAvailableMemory() / (1024 * 1024));
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Success",resData));
         } catch (ResourceNotFoundException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseData(e.getMessage()));
@@ -62,7 +63,31 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Success!", userService.getUserSong(username)));
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Success!", userService.getUserSongs(username)));
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseData(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/songs/upload/single")
+    private ResponseEntity<ResponseData> uploadUserSong(@RequestParam("file") MultipartFile file){
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            userService.addSongToUser(username,file);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Upload file "+ file.getOriginalFilename() +" successful"));
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseData(e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/songs/{id}")
+    private ResponseEntity<ResponseData> deleteUserSong(@PathVariable("id") Long id){
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            userService.deleteSongFromUser(username,id);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Song " + id + " delete successfully!"));
         } catch (Exception e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseData(e.getMessage()));
         }
