@@ -13,15 +13,21 @@ public class SongDto {
 
     private Date uploadDate;
 
+    private String fileName;
+
     private String name;
 
     private String artist;
+
+    private String album;
 
     private String albumImageBase64;
 
     private String releaseDate;
 
     private int duration;
+
+    private double size;
 
     private boolean favorite = false;
 }

@@ -1,5 +1,6 @@
 package org.example.dbconnectdemo.service;
 
+import org.example.dbconnectdemo.dto.SongDto;
 import org.example.dbconnectdemo.dto.UserDto;
 import org.example.dbconnectdemo.model.Song;
 import org.example.dbconnectdemo.model.User;
@@ -19,9 +20,17 @@ public interface UserService{
 
     void deleteUser(String username, String inputPassword);
 
-    List<Song> getUserSongs(String username);
+    List<SongDto> getUserSongs(String username);
+
+    Song getUserSong(String username, Long songId);
+
+    List<SongDto> getUserFavoriteSongs(String username);
+
+    SongDto updateUserFavoriteSong(String username, Long songId, boolean isFavorite);
 
     void addSongToUser(String username, MultipartFile file) throws IOException, CannotReadException, TagException, InvalidAudioFrameException, ReadOnlyFileException;
 
-    void deleteSongFromUser(String username, Long id);
+    void addSongsToUser(String username, MultipartFile[] files) throws IOException, CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException;
+
+    SongDto deleteSongFromUser(String username, Long id);
 }

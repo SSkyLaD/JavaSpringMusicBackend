@@ -1,6 +1,5 @@
 package org.example.dbconnectdemo.service;
 
-import org.example.dbconnectdemo.dto.ResponseData;
 import org.example.dbconnectdemo.dto.UserDto;
 
 public interface AuthenticateService {
