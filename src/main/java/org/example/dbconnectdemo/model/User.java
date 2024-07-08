@@ -21,12 +21,18 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User extends AppUser {
+    private String userDir;
 
-    @OneToOne(cascade = CascadeType.ALL)
-    private StorageList userStorageList = new StorageList();
+    private double availableMemory = 1024 * 1024 * 1024;
+
+    private int sumOfSongs = 0;
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_owner_id", referencedColumnName = "id")
-    private List<CustomList> userCustomList = new ArrayList<>();
+    private List<Song> userSongs = new ArrayList<>();
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "user_owner_id", referencedColumnName = "id")
+    private List<SongList> userSongLists = new ArrayList<>();
 
 }
