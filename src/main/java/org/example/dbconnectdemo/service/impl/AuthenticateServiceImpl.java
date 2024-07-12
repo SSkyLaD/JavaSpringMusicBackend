@@ -10,7 +10,6 @@ import org.example.dbconnectdemo.service.UserService;
 import org.example.dbconnectdemo.spring_security.JwtUlti;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +22,7 @@ public class AuthenticateServiceImpl implements AuthenticateService {
     private final JwtUlti jwtUlti;
 
     private final AuthenticationManager authenticationManager;
+
     private final UserRepository userRepository;
 
     @Override
@@ -33,22 +33,16 @@ public class AuthenticateServiceImpl implements AuthenticateService {
 
     @Override
     public String login(UserDto userDto) {
-        if(userDto.getUsername() == null || userDto.getUsername().isEmpty()){
+        if (userDto.getUsername() == null || userDto.getUsername().isEmpty()) {
             throw new InvalidInputException("Username cannot be blank");
         }
-        if(userDto.getPassword() == null || userDto.getPassword().isEmpty()){
+        if (userDto.getPassword() == null || userDto.getPassword().isEmpty()) {
             throw new InvalidInputException("Password cannot be blank");
         }
 
         //Validate username and password throw AuthenticationException
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        userDto.getUsername(),
-                        userDto.getPassword()
-                )
-        );
-        UserDetails user = userRepository.findByUsername(userDto.getUsername())
-                .orElseThrow();
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(userDto.getUsername(), userDto.getPassword()));
+        UserDetails user = userRepository.findByUsername(userDto.getUsername()).orElseThrow();
         return jwtUlti.generateToken(user);
     }
 }

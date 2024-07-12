@@ -13,7 +13,8 @@ import java.util.List;
 @Table(
         name ="USERS",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = "username")
+                @UniqueConstraint(columnNames = "username"),
+                @UniqueConstraint(columnNames = "email")
         }
 )
 @Getter

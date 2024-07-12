@@ -15,11 +15,14 @@ import org.example.dbconnectdemo.model.User;
 import org.example.dbconnectdemo.repository.SongRepository;
 import org.example.dbconnectdemo.repository.UserRepository;
 import org.example.dbconnectdemo.service.AdminService;
+import org.example.dbconnectdemo.service.Ultility;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.apache.catalina.startup.ExpandWar.deleteDir;
@@ -39,6 +42,41 @@ public class AdminServiceImpl implements AdminService {
             throw new NotAuthorizeException();
         }
         List<User> users = userRepository.findAll();
+        List<UserDto> userDtos = new ArrayList<>();
+        for(User appUser : users){
+            if (appUser.getRole().equals(Role.ADMIN)){
+                continue;
+            }
+            userDtos.add(UserMapper.mapToUserDto(appUser));
+        }
+        return userDtos;
+    }
+
+    @Override
+    public List<UserDto> getAllUserDetailWithSort(String adminName, String field, String direction) {
+        User admin = userRepository.findByUsername(adminName).orElseThrow(()-> new ResourceNotFoundException("Cannot find user"));
+        if (!admin.getRole().equals(Role.ADMIN)){
+            throw new NotAuthorizeException();
+        }
+        List<User> users = userRepository.findAll();
+        if(field.equals("username")){
+            users.sort(Comparator.comparing(User::getUsername));
+        }
+        if(field.equals("email")){
+            users.sort(Comparator.comparing(User::getEmail));
+        }
+        if(field.equals("createDate")){
+            users.sort(Comparator.comparing(User::getCreateDate));
+        }
+        if(field.equals("songs")){
+            users.sort(Comparator.comparing(User::getSumOfSongs));
+        }
+        if(field.equals("memory")){
+            users.sort(Comparator.comparing(User::getAvailableMemory));
+        }
+        if(direction.equals("desc")){
+            Collections.reverse(users);
+        }
         List<UserDto> userDtos = new ArrayList<>();
         for(User appUser : users){
             if (appUser.getRole().equals(Role.ADMIN)){
@@ -73,13 +111,29 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public List<SongDto> getUserSongs(String adminName, Long userId) {
+    public List<SongDto> getAllUserSongs(String adminName, Long userId) {
         User admin = userRepository.findByUsername(adminName).orElseThrow(()-> new ResourceNotFoundException("Cannot find user"));
         if (!admin.getRole().equals(Role.ADMIN)){
             throw new NotAuthorizeException();
         }
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         List<Song> songs = user.getUserSongs();
+        List<SongDto> songsdto = new ArrayList<>();
+        for (Song song : songs) {
+            songsdto.add(SongMapper.mapToSongDto(song));
+        }
+        return songsdto;
+    }
+
+    @Override
+    public List<SongDto> getAllUserSongsWithSort(String adminName, Long userId, String field, String direction) {
+        User admin = userRepository.findByUsername(adminName).orElseThrow(()-> new ResourceNotFoundException("Cannot find user"));
+        if (!admin.getRole().equals(Role.ADMIN)){
+            throw new NotAuthorizeException();
+        }
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        List<Song> songs = user.getUserSongs();
+        Ultility.sortSongs(songs,field,direction);
         List<SongDto> songsdto = new ArrayList<>();
         for (Song song : songs) {
             songsdto.add(SongMapper.mapToSongDto(song));

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.apache.commons.io.FilenameUtils;
 import org.example.dbconnectdemo.dto.*;
+import org.example.dbconnectdemo.exception.InvalidInputException;
 import org.example.dbconnectdemo.exception.ResourceNotFoundException;
 import org.example.dbconnectdemo.map.SongMapper;
 import org.example.dbconnectdemo.model.Song;
@@ -11,7 +12,10 @@ import org.example.dbconnectdemo.model.SongList;
 import org.example.dbconnectdemo.model.User;
 import org.example.dbconnectdemo.service.UserService;
 import org.example.dbconnectdemo.spring_security.JwtUlti;
-import org.springframework.core.io.*;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,8 +26,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Mono;
-
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -36,14 +42,12 @@ import java.util.Map;
 public class UserController {
 
     private final JwtUlti jwtUlti;
+    private final UserService userService;
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Object> maxUploadSizeExceeded(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage() + " (200MB)"));
     }
-
-    private final UserService userService;
-
-    private final ResourceLoader resourceLoader;
 
     @GetMapping
     private ResponseEntity<Object> getUserData() {
@@ -80,19 +84,55 @@ public class UserController {
         }
     }
 
+
+    // TODO fix bug when sort by id
+    // Allow Sort by all field in song, uploadDate ASC and DESC
+    // api/v1/users/songs?pageNo=0field=name&direction=asc
     @GetMapping("/songs")
-    private ResponseEntity<Object> getUserSongs() {
+    private ResponseEntity<Object> getUserSongs(@RequestParam(required = false) Map<String, String> qparams) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            List<SongDto> data = userService.getUserSongs(username);
+            if (!qparams.isEmpty()) {
+                int pageNo = qparams.get("pageNo") == null ? 0 : Integer.parseInt(qparams.get("pageNo"));
+                int pageSize = 20; // fix pageSize = 20;
+                String field = qparams.get("field") == null ? "uploadDate" : qparams.get("field");
+                String direction = qparams.get("direction") == null ? "asc" : qparams.get("direction");
+                List<SongDto> data = userService.getAllUserSongsWithSortAndPaging(username,pageNo,pageSize, field, direction);
+                return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+            }
+
+            //For old frontend
+            List<SongDto> data = userService.getAllUserSongs(username);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
 
-    //Remove song ra khoi các userlist truoc khi xoa
+
+    // /api/v1/users/songs/search?name=name&pageNo=0
+    @GetMapping("/songs/search")
+    private ResponseEntity<Object> searchUserSongs(@RequestParam Map<String,String> params){
+        try{
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            if(params.get("pageNo") != null){
+                String name = params.get("name") == null ? "" : params.get("name");
+                int pageNo = Integer.parseInt(params.get("pageNo"));
+                int pageSize = 20; // fix pageSize = 20;
+                List<SongDto> data = userService.searchAllUserSongsLikeNameWithPaging(username,pageNo,pageSize,name);
+                return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+            }
+            String name = params.get("name") == null ? "" : params.get("name");
+            List<SongDto> data = userService.searchAllUserSongsLikeName(username,name);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
+        }
+    }
+
+
     @DeleteMapping("/songs/{id}")
     private ResponseEntity<Object> deleteUserSong(@PathVariable("id") Long id) {
         try {
@@ -105,14 +145,45 @@ public class UserController {
         }
     }
 
+    // Allow Sort by Name, Artist, Duration, Size, uploadDate ASC and DESC
+    // /api/v1/users/songs/favorites?field=name&direction=desc
     @GetMapping("/songs/favorites")
-    private ResponseEntity<Object> getUserFavorites() {
+    private ResponseEntity<Object> getUserFavorites(@RequestParam(required = false) Map<String, String> qparams) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            List<SongDto> data = userService.getUserFavoriteSongs(username);
+            if (!qparams.isEmpty()) {
+                int pageNo = qparams.get("pageNo") == null ? 0 : Integer.parseInt(qparams.get("pageNo"));
+                int pageSize = 20; // fix pageSize = 20;
+                String field = qparams.get("field") == null ? "uploadDate" : qparams.get("field");
+                String direction = qparams.get("direction") == null ? "asc" : qparams.get("direction");
+                List<SongDto> data = userService.getAllUserFavoriteSongsWithSortAndPaging(username,pageNo,pageSize, field, direction);
+                return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+            }
+            List<SongDto> data = userService.getAllUserFavoriteSongs(username);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
         } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
+        }
+    }
+
+    // /api/v1/users/songs/favorite/search?name=name&pageNo=0
+    @GetMapping("/songs/favorite/search")
+    private ResponseEntity<Object> searchUserFavoriteSongs(@RequestParam Map<String,String> params){
+        try{
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            if(params.get("pageNo") != null){
+                String name = params.get("name") == null ? "" : params.get("name");
+                int pageNo = Integer.parseInt(params.get("pageNo"));
+                int pageSize = 20; // fix pageSize = 20;
+                List<SongDto> data = userService.searchAllUserFavoriteSongsLikeNameWithPaging(username,pageNo,pageSize,name);
+                return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+            }
+            String name = params.get("name") == null ? "" : params.get("name");
+            List<SongDto> data = userService.searchAllUserFavoriteSongsLikeName(username,name);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", data.size(), data));
+        } catch (Exception e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
@@ -122,8 +193,6 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            System.out.println(isFavorite);
-            System.out.println(isFavorite.get("isFavorite"));
             SongDto song = userService.updateUserFavoriteSong(username, id, isFavorite.get("isFavorite"));
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Success!", song));
         } catch (Exception e) {
@@ -131,11 +200,8 @@ public class UserController {
         }
     }
 
-    //NEW VERSION
     @GetMapping("/songs/stream/{token}/{id}")
-    private Mono<ResponseEntity<Resource>> stream(@PathVariable("id") Long id,
-                                                  @PathVariable("token") String token,
-                                                  @RequestHeader(value = "Range", required = false) String rangeHeader) {
+    private Mono<ResponseEntity<Resource>> stream(@PathVariable("id") Long id, @PathVariable("token") String token, @RequestHeader(value = "Range", required = false) String rangeHeader) {
         String username = jwtUlti.extractUsername(token);
         Song song = userService.getUserSong(username, id);
         String filePathString = song.getFileUrl();
@@ -149,10 +215,7 @@ public class UserController {
         }
 
         if (rangeHeader == null) {
-            return Mono.just(ResponseEntity.ok()
-                    .contentType(getMediaType(filePathString))
-                    .contentLength(fileSize)
-                    .body(resource));
+            return Mono.just(ResponseEntity.ok().contentType(getMediaType(filePathString)).contentLength(fileSize).body(resource));
         }
 
         String[] ranges = rangeHeader.replace("bytes=", "").split("-");
@@ -184,14 +247,11 @@ public class UserController {
 
     private MediaType getMediaType(String filePath) {
         String extension = FilenameUtils.getExtension(filePath);
-        switch (extension) {
-            case "mp3":
-                return MediaType.valueOf("audio/mp3");
-            case "flac":
-                return MediaType.valueOf("audio/x-flac");
-            default:
-                return MediaType.APPLICATION_OCTET_STREAM;
-        }
+        return switch (extension) {
+            case "mp3" -> MediaType.valueOf("audio/mp3");
+            case "flac" -> MediaType.valueOf("audio/x-flac");
+            default -> MediaType.APPLICATION_OCTET_STREAM;
+        };
     }
 
     @GetMapping("/songs/download/{id}")
@@ -201,45 +261,37 @@ public class UserController {
             String username = authentication.getName();
             Song song = userService.getUserSong(username, id);
             File file = new File(song.getFileUrl());
-            String[] nameSplit = file.getName().split("-");
-            String filename = "";
             String subtype = FilenameUtils.getExtension(file.getName()).equals("flac") ? "x-flac" : "mp3";
-            for (int i = 1; i < nameSplit.length; i++) {
-                filename += nameSplit[i] + "-";
-            }
-            filename = filename.substring(0, filename.length() - 1);
-            return ResponseEntity.status(HttpStatus.OK)
-                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
-                    .contentType(new MediaType("audio", subtype)) // FLAC - MP3
-                    .contentLength(file.length())
-                    .body(new InputStreamResource(new FileInputStream(file)));
-
+            return ResponseEntity.status(HttpStatus.OK).header("Content-Disposition", "attachment; filename=\"" + song.getFileName() + "\"").contentType(new MediaType("audio", subtype)) // FLAC - MP3
+                    .contentLength(file.length()).body(new InputStreamResource(new FileInputStream(file)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
 
-    // 2024-7-8 Check Storage before upload + If admin Storage dont increase
     @PostMapping("/songs/upload/single")
     private ResponseEntity<Object> uploadUserSong(@RequestParam("file") MultipartFile file) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             userService.addSongToUser(username, file);
-            return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage("Upload file " + file.getOriginalFilename() + " successful"));
+            return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseMessage("Upload file " + file.getOriginalFilename() + " successful"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
 
-    // 2024-7-8 Check Storage before upload + If admin Storage dont increase
     @PostMapping("/songs/upload/multi")
     private ResponseEntity<Object> uploadUserSongs(@RequestParam("files") MultipartFile[] files) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            userService.addSongsToUser(username, files);
-            return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage("Uploaded " + files.length + " files successful"));
+            List<String> result = userService.addSongsToUser(username, files);
+            int uploaded = files.length - result.size();
+            if (uploaded == 0) {
+                throw new InvalidInputException("No files uploaded");
+            }
+            return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseMessage("Uploaded " + uploaded + " files successful"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
@@ -264,7 +316,7 @@ public class UserController {
             String username = authentication.getName();
             List<SongListDto> songListDto = userService.getAllUserCustomLists(username);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", songListDto.size(), songListDto));
-        } catch (Exception e){
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
@@ -274,13 +326,13 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            SongList songList = userService.getUserCustomList(username,id);
+            SongList songList = userService.getUserCustomList(username, id);
             List<SongDto> songDtos = new ArrayList<>();
-            for(Song songs : songList.getSongs()){
+            for (Song songs : songList.getSongs()) {
                 songDtos.add(SongMapper.mapToSongDto(songs));
             }
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseData("Success!", songDtos));
-        } catch (Exception e){
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
@@ -290,20 +342,20 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            SongList songList = userService.deleteUserCustomList(username,id);
+            SongList songList = userService.deleteUserCustomList(username, id);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage("Deleted list " + songList.getName() + " successfully!"));
-        } catch (Exception e){
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
 
     @PatchMapping("/lists/{id}")
-    private ResponseEntity<Object> updateSongList(@PathVariable Long id, @RequestBody Map<String,String> listName) {
+    private ResponseEntity<Object> updateSongList(@PathVariable Long id, @RequestBody Map<String, String> listName) {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            SongList songList = userService.updateUserCustomList(username,id,listName.get("name"));
-            return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage("Song list updated successfully!"));
+            SongList songList = userService.updateUserCustomList(username, id, listName.get("name"));
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage("Song list rename to " + songList.getName() + " successfully!"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
@@ -314,10 +366,9 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            String message = userService.addSongToCustomList(username,id,songId);
+            String message = userService.addSongToCustomList(username, id, songId);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage(message));
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.toString()));
         }
     }
@@ -327,9 +378,9 @@ public class UserController {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            String message = userService.removeSongFromCustomList(username,id,songId);
+            String message = userService.removeSongFromCustomList(username, id, songId);
             return ResponseEntity.status(HttpStatus.OK).body(new ResponseMessage(message));
-        } catch (Exception e){
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }

@@ -2,8 +2,9 @@ package org.example.dbconnectdemo.service.impl;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
-import org.example.dbconnectdemo.dto.SongListDto;
+import org.apache.commons.io.FilenameUtils;
 import org.example.dbconnectdemo.dto.SongDto;
+import org.example.dbconnectdemo.dto.SongListDto;
 import org.example.dbconnectdemo.dto.UserDto;
 import org.example.dbconnectdemo.exception.InvalidInputException;
 import org.example.dbconnectdemo.exception.ResourceNotFoundException;
@@ -11,12 +12,14 @@ import org.example.dbconnectdemo.exception.UsernameAlreadyExistException;
 import org.example.dbconnectdemo.map.SongListMapper;
 import org.example.dbconnectdemo.map.SongMapper;
 import org.example.dbconnectdemo.map.UserMapper;
+import org.example.dbconnectdemo.model.Role;
 import org.example.dbconnectdemo.model.Song;
 import org.example.dbconnectdemo.model.SongList;
 import org.example.dbconnectdemo.model.User;
 import org.example.dbconnectdemo.repository.SongListRepository;
 import org.example.dbconnectdemo.repository.SongRepository;
 import org.example.dbconnectdemo.repository.UserRepository;
+import org.example.dbconnectdemo.service.Ultility;
 import org.example.dbconnectdemo.service.UserService;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
@@ -28,22 +31,24 @@ import org.jaudiotagger.tag.FieldKey;
 import org.jaudiotagger.tag.Tag;
 import org.jaudiotagger.tag.TagException;
 import org.jaudiotagger.tag.images.Artwork;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
-
 import static org.apache.catalina.startup.ExpandWar.deleteDir;
 
 @Service
 @AllArgsConstructor
 public class UserServiceImpl implements UserService {
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final SongRepository songRepository;
@@ -60,7 +65,7 @@ public class UserServiceImpl implements UserService {
         if (userDto.getPassword() == null || userDto.getPassword().isEmpty()) {
             throw new InvalidInputException("Password cannot be blank");
         }
-        String EMAIL_PATTERN = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+        String EMAIL_PATTERN = "^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
         if (!userDto.getEmail().matches(EMAIL_PATTERN)) {
             throw new InvalidInputException("Invalid email address");
         }
@@ -105,11 +110,10 @@ public class UserServiceImpl implements UserService {
         userRepository.deleteUserByUsername(username);
     }
 
-    //Todo Paging response data
     @Override
-    public List<SongDto> getUserSongs(String username) {
+    public List<SongDto> getAllUserSongs(String username) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
-        List<Song> songs = user.getUserSongs();
+        List<Song> songs = songRepository.findByUserOwnerId(user.getId()); //List<Song> songs = user.getUserSongs();
         List<SongDto> songsdto = new ArrayList<>();
         for (Song song : songs) {
             songsdto.add(SongMapper.mapToSongDto(song));
@@ -117,29 +121,110 @@ public class UserServiceImpl implements UserService {
         return songsdto;
     }
 
+
     @Override
-    public Song getUserSong(String username, Long songId) {
+    public List<SongDto> getAllUserSongsWithSortAndPaging(String username, int pageNo, int pageSize, String field, String direction) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
-        List<Song> songs = user.getUserSongs();
-        for (Song song : songs) {
-            if (songId.equals(song.getId())) {
-                return song;
-            }
+        Pageable paging = null;
+        if(Objects.equals(direction, "asc")){
+            paging = PageRequest.of(pageNo, pageSize, Sort.by(field).ascending());
         }
-        throw new ResourceNotFoundException("Cannot find song");
+        if(Objects.equals(direction, "desc")){
+            paging = PageRequest.of(pageNo, pageSize, Sort.by(field).descending());
+        }
+        List<Song> songs = songRepository.findAllByUserOwnerId(user.getId(), paging);
+        Ultility.sortSongs(songs, field, direction);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : songs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
+        }
+        return songsDto;
     }
 
     @Override
-    public List<SongDto> getUserFavoriteSongs(String username) {
+    public List<SongDto> searchAllUserSongsLikeNameWithPaging(String username, int pageNo, int pageSize, String name) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
-        List<Song> songs = user.getUserSongs();
-        List<SongDto> favoriteSongs = new ArrayList<>();
-        for (Song song : songs) {
-            if (song.isFavorite()) {
-                favoriteSongs.add(SongMapper.mapToSongDto(song));
-            }
+        Pageable paging = PageRequest.of(pageNo, pageSize);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContaining(user.getId(),name,paging);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : songs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
         }
-        return favoriteSongs;
+        return songsDto;
+    }
+
+    @Override
+    public List<SongDto> searchAllUserSongsLikeName(String username, String name) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContaining(user.getId(),name);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : songs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
+        }
+        return songsDto;
+    }
+
+
+    @Override
+    public Song getUserSong(String username, Long songId) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        Song song = songRepository.findByIdAndUserOwnerId(songId, user.getId());
+        if (song == null) {
+            throw new ResourceNotFoundException("Cannot find song");
+        }
+        return song;
+    }
+
+    @Override
+    public List<SongDto> getAllUserFavoriteSongs(String username) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        List<Song> favoriteSongs = songRepository.findByUserOwnerIdAndFavorite(user.getId(), true);
+        List<SongDto> favoriteSongsDto = new ArrayList<>();
+        for (Song song : favoriteSongs) {
+            favoriteSongsDto.add(SongMapper.mapToSongDto(song));
+        }
+        return favoriteSongsDto;
+    }
+
+    @Override
+    public List<SongDto> getAllUserFavoriteSongsWithSortAndPaging(String username, int pageNo, int pageSize, String field, String direction) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        Pageable paging = null;
+        if(Objects.equals(direction, "asc")){
+            paging = PageRequest.of(pageNo, pageSize, Sort.by(field).ascending());
+        }
+        if(Objects.equals(direction, "desc")){
+            paging = PageRequest.of(pageNo, pageSize, Sort.by(field).descending());
+        }
+        List<Song> favoriteSongs = songRepository.findAllByUserOwnerIdAndFavorite(user.getId(),true,paging);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : favoriteSongs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
+        }
+        return songsDto;
+    }
+
+    @Override
+    public List<SongDto> searchAllUserFavoriteSongsLikeNameWithPaging(String username, int pageNo, int pageSize, String name) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        Pageable paging = PageRequest.of(pageNo, pageSize);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContaining(user.getId(),true,name,paging);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : songs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
+        }
+        return songsDto;
+    }
+
+    @Override
+    public List<SongDto> searchAllUserFavoriteSongsLikeName(String username, String name) {
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContaining(user.getId(),true,name);
+        List<SongDto> songsDto = new ArrayList<>();
+        for (Song aSong : songs) {
+            songsDto.add(SongMapper.mapToSongDto(aSong));
+        }
+        return songsDto;
     }
 
     @Override
@@ -161,9 +246,16 @@ public class UserServiceImpl implements UserService {
         List<String> allowFileType = new ArrayList<>();
         allowFileType.add("audio/flac");
         allowFileType.add("audio/x-flac");
-        allowFileType.add("audio/mp3");
+        allowFileType.add("audio/mpeg");
+        String extension = FilenameUtils.getExtension(file.getOriginalFilename());
+        if ((!Objects.equals(extension, "flac") && !Objects.equals(extension, "mp3")) || extension.isEmpty()) {
+            throw new InvalidInputException("Invalid file type");
+        }
         if (!allowFileType.contains(file.getContentType())) {
             throw new InvalidInputException("Invalid file type");
+        }
+        if (file.getSize() > user.getAvailableMemory()) {
+            throw new InvalidInputException("Memory limit exceeded");
         }
         Song song = new Song();
         song.setFileName(file.getOriginalFilename());
@@ -177,21 +269,25 @@ public class UserServiceImpl implements UserService {
         Tag tag = audioFile.getTag();
 
         String[] filenameSplit = Objects.requireNonNull(file.getOriginalFilename()).split("-");
-        String artist = filenameSplit[filenameSplit.length - 1];
-        String title = "";
-        artist = artist.replaceAll("\\.(flac|mp3)$", "").trim();
+        String title = filenameSplit[filenameSplit.length - 1];
+        StringBuilder artist = new StringBuilder();
+        title = title.replaceAll("\\.(flac|mp3)$", "").trim();
 
         for (int i = 0; i < filenameSplit.length - 1; i++) {
-            title += filenameSplit[i] + " ";
+            artist.append(filenameSplit[i]).append(" ");
         }
-        title = title.trim();
+        artist = new StringBuilder(artist.toString().trim());
 
         song.setName(title);
-        song.setArtist(artist);
+        song.setArtist(artist.toString());
 
         if (tag != null) {
-            song.setName(tag.getFirst(FieldKey.TITLE));
-            song.setArtist(tag.getFirst(FieldKey.ARTIST));
+            if (!tag.getFirst(FieldKey.TITLE).isEmpty()) {
+                song.setName(tag.getFirst(FieldKey.TITLE));
+            }
+            if (!tag.getFirst(FieldKey.ARTIST).isEmpty()) {
+                song.setArtist(tag.getFirst(FieldKey.ARTIST));
+            }
             song.setAlbum(tag.getFirst(FieldKey.ALBUM));
             song.setReleaseDate(tag.getFirst(FieldKey.YEAR));
             Artwork artwork = tag.getFirstArtwork();
@@ -201,22 +297,37 @@ public class UserServiceImpl implements UserService {
             }
         }
         song.setDuration(audioHeader.getTrackLength());
+
+
+
         user.getUserSongs().add(song);
         user.setSumOfSongs(user.getUserSongs().size());
-        user.setAvailableMemory(user.getAvailableMemory() - song.getSize());
+        if (!user.getRole().equals(Role.ADMIN)) {
+            user.setAvailableMemory(user.getAvailableMemory() - song.getSize());
+        }
         userRepository.save(user);
     }
 
     @Override
-    public void addSongsToUser(String username, MultipartFile[] files) throws IOException, CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException {
+    public List<String> addSongsToUser(String username, MultipartFile[] files) throws IOException, CannotReadException, TagException, ReadOnlyFileException, InvalidAudioFrameException {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         List<String> allowFileType = new ArrayList<>();
         allowFileType.add("audio/flac");
         allowFileType.add("audio/x-flac");
-        allowFileType.add("audio/mp3");
+        allowFileType.add("audio/mpeg");
+        List<String> result = new ArrayList<>();
         for (MultipartFile file : files) {
+            String extension = FilenameUtils.getExtension(file.getOriginalFilename());
+            if ((!Objects.equals(extension, "flac") && !Objects.equals(extension, "mp3")) || extension.isEmpty()) {
+                result.add("File " + file.getOriginalFilename() + " is invalid");
+                continue;
+            }
             if (!allowFileType.contains(file.getContentType())) {
-                throw new InvalidInputException("Invalid file type");
+                result.add("File " + file.getOriginalFilename() + " is invalid");
+                continue;
+            }
+            if (file.getSize() > user.getAvailableMemory()) {
+                throw new InvalidInputException("Memory limit exceeded");
             }
             Song song = new Song();
             song.setFileName(file.getOriginalFilename());
@@ -230,35 +341,46 @@ public class UserServiceImpl implements UserService {
             Tag tag = audioFile.getTag();
 
             String[] filenameSplit = Objects.requireNonNull(file.getOriginalFilename()).split("-");
-            String artist = filenameSplit[filenameSplit.length - 1];
-            String title = "";
-            artist = artist.replaceAll("\\.(flac|mp3)$", "").trim();
+            String title = filenameSplit[filenameSplit.length - 1];
+            StringBuilder artist = new StringBuilder();
+            title = title.replaceAll("\\.(flac|mp3)$", "").trim();
 
             for (int i = 0; i < filenameSplit.length - 1; i++) {
-                title += filenameSplit[i] + " ";
+                artist.append(filenameSplit[i]).append(" ");
             }
-            title = title.trim();
+            artist = new StringBuilder(artist.toString().trim());
 
             song.setName(title);
-            song.setArtist(artist);
+            song.setArtist(artist.toString());
 
             if (tag != null) {
-                song.setName(tag.getFirst(FieldKey.TITLE));
-                song.setArtist(tag.getFirst(FieldKey.ARTIST));
+                if (!tag.getFirst(FieldKey.TITLE).isEmpty()) {
+                    song.setName(tag.getFirst(FieldKey.TITLE));
+                }
+                if (!tag.getFirst(FieldKey.ARTIST).isEmpty()) {
+                    song.setArtist(tag.getFirst(FieldKey.ARTIST));
+                }
                 song.setAlbum(tag.getFirst(FieldKey.ALBUM));
                 song.setReleaseDate(tag.getFirst(FieldKey.YEAR));
                 Artwork artwork = tag.getFirstArtwork();
                 if (artwork != null) {
                     byte[] imageBytes = artwork.getBinaryData();
-                    song.setAlbumImageBase64("data:jpeg/png;base64," + Base64.getEncoder().encodeToString(imageBytes));
+                    song.setAlbumImageBase64("data:image/jpeg;base64," + Base64.getEncoder().encodeToString(imageBytes));
                 }
             }
             song.setDuration(audioHeader.getTrackLength());
+
+            System.out.print(song.getArtist() + " " + song.getName() + " " + song.getFileUrl());
+
+
             user.getUserSongs().add(song);
             user.setSumOfSongs(user.getSumOfSongs() + 1);
-            user.setAvailableMemory(user.getAvailableMemory() - song.getSize());
+            if (!user.getRole().equals(Role.ADMIN)) {
+                user.setAvailableMemory(user.getAvailableMemory() - song.getSize());
+            }
             userRepository.save(user);
         }
+        return result;
     }
 
     @Override
@@ -271,6 +393,7 @@ public class UserServiceImpl implements UserService {
                     if (list.getSongs().contains(song)) {
                         list.setSumOfSongs(list.getSumOfSongs() - 1);
                         list.getSongs().remove(song);
+                        break;
                     }
                 }
                 File songFile = new File(song.getFileUrl());
@@ -353,6 +476,9 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         for (SongList list : user.getUserSongLists()) {
             if (list.getId().equals(listId)) {
+                if (list.getSumOfSongs() == 30) {
+                    throw new InvalidInputException("List is full");
+                }
                 for (Song song : user.getUserSongs()) {
                     if (song.getId().equals(songId)) {
                         list.getSongs().add(song);

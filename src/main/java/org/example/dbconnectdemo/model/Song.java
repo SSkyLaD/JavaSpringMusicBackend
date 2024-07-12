@@ -51,4 +51,7 @@ public class Song {
 
     @ManyToMany(mappedBy = "songs", fetch = FetchType.EAGER)
     private List<SongList> songLists;
+
+    @Column(name = "user_owner_id")
+    private Long userOwnerId;
 }
