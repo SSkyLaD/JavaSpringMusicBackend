@@ -87,7 +87,7 @@ public class UserController {
 
     // TODO fix bug when sort by id
     // Allow Sort by all field in song, uploadDate ASC and DESC
-    // api/v1/users/songs?pageNo=0field=name&direction=asc
+    // api/v1/users/songs?pageNo=0&field=name&direction=asc
     @GetMapping("/songs")
     private ResponseEntity<Object> getUserSongs(@RequestParam(required = false) Map<String, String> qparams) {
         try {

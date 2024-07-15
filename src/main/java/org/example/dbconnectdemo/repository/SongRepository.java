@@ -13,13 +13,13 @@ public interface SongRepository extends PagingAndSortingRepository<Song, Long> {
 
     List<Song> findAllByUserOwnerId(Long userOwnerId, Pageable pageable);
 
-    List<Song> findAllByUserOwnerIdAndNameContaining(Long userOwnerId, String name);
+    List<Song> findAllByUserOwnerIdAndNameContainingOrArtistContaining(Long userOwnerId, String name,String artist);
 
-    List<Song> findAllByUserOwnerIdAndNameContaining(Long userOwnerId, String name, Pageable pageable);
+    List<Song> findAllByUserOwnerIdAndNameContainingOrArtistContaining(Long userOwnerId, String name,String artist, Pageable pageable);
 
-    List<Song> findAllByUserOwnerIdAndFavoriteAndNameContaining(Long userOwnerId, boolean favorite, String name);
+    List<Song> findAllByUserOwnerIdAndFavoriteAndNameContainingOrArtistContaining(Long userOwnerId, boolean favorite, String name,String artist);
 
-    List<Song> findAllByUserOwnerIdAndFavoriteAndNameContaining(Long userOwnerId, boolean favorite, String name, Pageable pageable);
+    List<Song> findAllByUserOwnerIdAndFavoriteAndNameContainingOrArtistContaining(Long userOwnerId, boolean favorite, String name,String artist, Pageable pageable);
 
     List<Song> findAllByUserOwnerIdAndFavorite(Long userOwnerId, boolean favorite,Pageable pageable);
 

@@ -15,10 +15,9 @@ import org.example.dbconnectdemo.model.User;
 import org.example.dbconnectdemo.repository.SongRepository;
 import org.example.dbconnectdemo.repository.UserRepository;
 import org.example.dbconnectdemo.service.AdminService;
-import org.example.dbconnectdemo.service.Ultility;
+import org.example.dbconnectdemo.service.Utility;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -105,7 +104,9 @@ public class AdminServiceImpl implements AdminService {
                 deleteDir(f);
             }
         }
-        userDir.delete();
+        if(!userDir.delete()){
+            throw new RuntimeException("User directory delete failed");
+        }
         userRepository.deleteUserByUsername(user.getUsername());
         return user.getUsername();
     }
@@ -133,7 +134,7 @@ public class AdminServiceImpl implements AdminService {
         }
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         List<Song> songs = user.getUserSongs();
-        Ultility.sortSongs(songs,field,direction);
+        Utility.sortSongs(songs,field,direction);
         List<SongDto> songsdto = new ArrayList<>();
         for (Song song : songs) {
             songsdto.add(SongMapper.mapToSongDto(song));
@@ -160,7 +161,9 @@ public class AdminServiceImpl implements AdminService {
                 File songFile = new File(song.getFileUrl());
                 user.setSumOfSongs(user.getSumOfSongs() - 1);
                 user.setAvailableMemory(user.getAvailableMemory() + song.getSize());
-                songFile.delete();
+                if(!songFile.delete()){
+                    throw new RuntimeException("File delete failed");
+                }
                 songs.remove(song);
                 songRepository.deleteById(songId);
                 user.setUserSongs(songs);

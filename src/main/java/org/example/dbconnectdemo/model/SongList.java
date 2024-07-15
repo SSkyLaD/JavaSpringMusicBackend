@@ -37,5 +37,8 @@ public class SongList{
     @JoinTable(name = "songlist_song",joinColumns = @JoinColumn(name ="songlist_id"),
             inverseJoinColumns = @JoinColumn(name = "song_id"),uniqueConstraints = {@UniqueConstraint(
             columnNames = {"songlist_id", "song_id"})})
-    protected List<Song> songs = new ArrayList<>();
+    private List<Song> songs = new ArrayList<>();
+
+    @Column(name = "user_owner_id")
+    private Long userOwnerId;
 }

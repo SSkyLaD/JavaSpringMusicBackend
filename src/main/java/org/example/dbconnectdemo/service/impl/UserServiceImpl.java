@@ -19,7 +19,7 @@ import org.example.dbconnectdemo.model.User;
 import org.example.dbconnectdemo.repository.SongListRepository;
 import org.example.dbconnectdemo.repository.SongRepository;
 import org.example.dbconnectdemo.repository.UserRepository;
-import org.example.dbconnectdemo.service.Ultility;
+import org.example.dbconnectdemo.service.Utility;
 import org.example.dbconnectdemo.service.UserService;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
@@ -76,10 +76,11 @@ public class UserServiceImpl implements UserService {
             throw new UsernameAlreadyExistException("Username already exist");
         }
 
-        //Todo add pathname to application.properties
-        File userDir = new File("D:\\LaD\\Study\\InternSummer2024\\MusicWebWithSpring\\JavaSpringMusicBackend\\src\\main\\resources\\" + userDto.getUsername());
+        File userDir = new File(Utility.STATIC_FILE_URL + userDto.getUsername());
         if (!userDir.exists()) {
-            userDir.mkdir();
+            if(!userDir.mkdir()){
+                throw new RuntimeException("Create directory failed");
+            }
         }
         User user = UserMapper.mapToUser(userDto);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
@@ -106,7 +107,9 @@ public class UserServiceImpl implements UserService {
                 deleteDir(f);
             }
         }
-        userDir.delete();
+        if(!userDir.delete()){
+            throw new RuntimeException("Delete directory failed");
+        }
         userRepository.deleteUserByUsername(username);
     }
 
@@ -133,7 +136,7 @@ public class UserServiceImpl implements UserService {
             paging = PageRequest.of(pageNo, pageSize, Sort.by(field).descending());
         }
         List<Song> songs = songRepository.findAllByUserOwnerId(user.getId(), paging);
-        Ultility.sortSongs(songs, field, direction);
+        Utility.sortSongs(songs, field, direction);
         List<SongDto> songsDto = new ArrayList<>();
         for (Song aSong : songs) {
             songsDto.add(SongMapper.mapToSongDto(aSong));
@@ -145,7 +148,7 @@ public class UserServiceImpl implements UserService {
     public List<SongDto> searchAllUserSongsLikeNameWithPaging(String username, int pageNo, int pageSize, String name) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         Pageable paging = PageRequest.of(pageNo, pageSize);
-        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContaining(user.getId(),name,paging);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContainingOrArtistContaining(user.getId(),name,name,paging);
         List<SongDto> songsDto = new ArrayList<>();
         for (Song aSong : songs) {
             songsDto.add(SongMapper.mapToSongDto(aSong));
@@ -156,7 +159,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<SongDto> searchAllUserSongsLikeName(String username, String name) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
-        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContaining(user.getId(),name);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndNameContainingOrArtistContaining(user.getId(),name,name);
         List<SongDto> songsDto = new ArrayList<>();
         for (Song aSong : songs) {
             songsDto.add(SongMapper.mapToSongDto(aSong));
@@ -208,7 +211,7 @@ public class UserServiceImpl implements UserService {
     public List<SongDto> searchAllUserFavoriteSongsLikeNameWithPaging(String username, int pageNo, int pageSize, String name) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
         Pageable paging = PageRequest.of(pageNo, pageSize);
-        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContaining(user.getId(),true,name,paging);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContainingOrArtistContaining(user.getId(),true,name,name,paging);
         List<SongDto> songsDto = new ArrayList<>();
         for (Song aSong : songs) {
             songsDto.add(SongMapper.mapToSongDto(aSong));
@@ -219,7 +222,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<SongDto> searchAllUserFavoriteSongsLikeName(String username, String name) {
         User user = userRepository.findByUsername(username).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
-        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContaining(user.getId(),true,name);
+        List<Song> songs = songRepository.findAllByUserOwnerIdAndFavoriteAndNameContainingOrArtistContaining(user.getId(),true,name,name);
         List<SongDto> songsDto = new ArrayList<>();
         for (Song aSong : songs) {
             songsDto.add(SongMapper.mapToSongDto(aSong));
@@ -399,7 +402,9 @@ public class UserServiceImpl implements UserService {
                 File songFile = new File(song.getFileUrl());
                 user.setSumOfSongs(user.getSumOfSongs() - 1);
                 user.setAvailableMemory(user.getAvailableMemory() + song.getSize());
-                songFile.delete();
+                if(!songFile.delete()){
+                    throw new RuntimeException("File delete failed");
+                }
                 songs.remove(song);
                 songRepository.deleteById(id);
                 user.setUserSongs(songs);
