@@ -23,22 +23,42 @@ public class AdminController {
     private final AdminService adminService;
 
     // Allow sort by username, email, createDate, songs, memory, asc or desc
-    // /api/v1/admin/users?field=memory&direction=desc
+    // /api/v1/admin/users?sortField=memory&direction=desc
     @GetMapping("/users")
     private ResponseEntity<Object> getAllUsersDetail(@RequestParam(required = false) Map<String,String> qparam){
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            if(!qparam.isEmpty()){
-                List<UserDto> users = adminService.getAllUserDetailWithSort(username,qparam.get("field"), qparam.get("direction"));
-                return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!",users.size(),users));
-            }
-            List<UserDto> users = adminService.getAllUsersDetail(username);
-            return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!",users.size(),users));
+            int pageNo = qparam.get("pageNo") == null || qparam.get("pageNo").isEmpty() ? 0 : Integer.parseInt(qparam.get("pageNo"));
+            int pageSize = 20;
+            String sortField = qparam.get("sortField") == null || qparam.get("sortField").isEmpty() ? "createDate" : qparam.get("pageNo");
+            String direction = qparam.get("direction") == null || qparam.get("direction").isEmpty() ? "asc" : qparam.get("direction");
+            List<UserDto> user = adminService.getAllUsersDetailWithSortAndPaging(username,pageNo,pageSize,sortField,direction);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", user.size(), user));
         } catch (Exception e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
         }
     }
+
+    // /api/v1/admin/users/search?username=username
+    @GetMapping("/users/search")
+    public ResponseEntity<Object> getAllUsersSearch(@RequestParam Map<String, String> qparam) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String adminName = authentication.getName();
+            String searchName = qparam.getOrDefault("username", "");
+            int pageNo = qparam.getOrDefault("pageNo", "").isEmpty() ? 0 : Integer.parseInt(qparam.get("pageNo"));
+            int pageSize = 20;
+            String sortField = qparam.getOrDefault("sortField", "createDate");
+            String direction = qparam.getOrDefault("direction", "asc");
+
+            List<UserDto> users = adminService.searchAllUsersByNameWithSortAndPaging(adminName, searchName, pageNo, pageSize, sortField, direction);
+            return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!", users.size(), users));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));
+        }
+    }
+
 
     @DeleteMapping("/users/{id}")
     private ResponseEntity<Object> deleteUser(@PathVariable Long id, @RequestBody Map<String,String> password){
@@ -53,14 +73,14 @@ public class AdminController {
     }
 
     // Allow Sort by Name, Artist, Duration, Size, uploadDate ASC and DESC
-    // /api/v1/admin/users/1/songs?field=uploadDate&direction=desc
+    // /api/v1/admin/users/1/songs?sortField=uploadDate&direction=desc
     @GetMapping("/users/{id}/songs")
     private ResponseEntity<Object> getUserSongs(@PathVariable("id") Long userId,@RequestParam(required = false) Map<String,String> qparam){
         try{
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             if(!qparam.isEmpty()){
-                List<SongDto> data = adminService.getAllUserSongsWithSort(username,userId,qparam.get("field"), qparam.get("direction"));
+                List<SongDto> data = adminService.getAllUserSongsWithSort(username,userId,qparam.get("sortField"), qparam.get("direction"));
                 return ResponseEntity.status(HttpStatus.OK).body(new ResponseDataList("Success!",data.size(),data));
             }
             List<SongDto> data = adminService.getAllUserSongs(username,userId);

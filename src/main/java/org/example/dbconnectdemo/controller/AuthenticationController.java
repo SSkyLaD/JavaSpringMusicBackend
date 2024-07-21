@@ -1,6 +1,7 @@
 package org.example.dbconnectdemo.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.dbconnectdemo.dto.RegisterBody;
 import org.example.dbconnectdemo.dto.ResponseData;
 import org.example.dbconnectdemo.dto.UserDto;
 import org.example.dbconnectdemo.exception.InvalidInputException;
@@ -20,9 +21,9 @@ public class AuthenticationController {
     private final AuthenticateService authenticateService;
 
     @PostMapping("/register")
-    public ResponseEntity<Object> register(@RequestBody UserDto userdto) {
+    public ResponseEntity<Object> register(@RequestBody RegisterBody registerBody) {
         try {
-            authenticateService.register(userdto);
+            authenticateService.register(registerBody);
             return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseMessage("Account created successfully!"));
         } catch (InvalidInputException e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ResponseMessage(e.getMessage()));

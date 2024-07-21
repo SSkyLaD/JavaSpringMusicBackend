@@ -16,13 +16,13 @@ import org.example.dbconnectdemo.repository.SongRepository;
 import org.example.dbconnectdemo.repository.UserRepository;
 import org.example.dbconnectdemo.service.AdminService;
 import org.example.dbconnectdemo.service.Utility;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 import static org.apache.catalina.startup.ExpandWar.deleteDir;
 
@@ -35,12 +35,19 @@ public class AdminServiceImpl implements AdminService {
     private final SongRepository songRepository;
 
     @Override
-    public List<UserDto> getAllUsersDetail(String adminName) {
+    public List<UserDto> getAllUsersDetailWithSortAndPaging(String adminName, int pageNo, int pageSize, String sortField, String direction) {
         User admin = userRepository.findByUsername(adminName).orElseThrow(()-> new ResourceNotFoundException("Cannot find user"));
         if (!admin.getRole().equals(Role.ADMIN)){
             throw new NotAuthorizeException();
         }
-        List<User> users = userRepository.findAll();
+        Pageable paging = null;
+        if(Objects.equals(direction, "asc")){
+            paging = PageRequest.of(pageNo,pageSize, Sort.by(sortField).ascending());
+        }
+        if(Objects.equals(direction, "desc")){
+            paging = PageRequest.of(pageNo,pageSize, Sort.by(sortField).descending());
+        }
+        List<User> users = userRepository.findAll(paging).getContent();
         List<UserDto> userDtos = new ArrayList<>();
         for(User appUser : users){
             if (appUser.getRole().equals(Role.ADMIN)){
@@ -52,39 +59,27 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public List<UserDto> getAllUserDetailWithSort(String adminName, String field, String direction) {
-        User admin = userRepository.findByUsername(adminName).orElseThrow(()-> new ResourceNotFoundException("Cannot find user"));
-        if (!admin.getRole().equals(Role.ADMIN)){
+    public List<UserDto> searchAllUsersByNameWithSortAndPaging(String adminName, String username, int pageNo, int pageSize, String sortField, String direction) {
+        User admin = userRepository.findByUsername(adminName).orElseThrow(() -> new ResourceNotFoundException("Cannot find user"));
+        if (!admin.getRole().equals(Role.ADMIN)) {
             throw new NotAuthorizeException();
         }
-        List<User> users = userRepository.findAll();
-        if(field.equals("username")){
-            users.sort(Comparator.comparing(User::getUsername));
-        }
-        if(field.equals("email")){
-            users.sort(Comparator.comparing(User::getEmail));
-        }
-        if(field.equals("createDate")){
-            users.sort(Comparator.comparing(User::getCreateDate));
-        }
-        if(field.equals("songs")){
-            users.sort(Comparator.comparing(User::getSumOfSongs));
-        }
-        if(field.equals("memory")){
-            users.sort(Comparator.comparing(User::getAvailableMemory));
-        }
-        if(direction.equals("desc")){
-            Collections.reverse(users);
-        }
+        Sort sort = Sort.by(Sort.Direction.fromString(direction), sortField);
+        Pageable paging = PageRequest.of(pageNo, pageSize, sort);
+
+        System.out.println(username);
+
+        List<User> users = userRepository.findByUsernameContaining(username, paging);
         List<UserDto> userDtos = new ArrayList<>();
-        for(User appUser : users){
-            if (appUser.getRole().equals(Role.ADMIN)){
+        for (User appUser : users) {
+            if (appUser.getRole().equals(Role.ADMIN)) {
                 continue;
             }
             userDtos.add(UserMapper.mapToUserDto(appUser));
         }
         return userDtos;
     }
+
 
     @Transactional
     @Override

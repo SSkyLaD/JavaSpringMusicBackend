@@ -8,9 +8,10 @@ import org.example.dbconnectdemo.dto.UserDto;
 import java.util.List;
 
 public interface AdminService {
-    List<UserDto> getAllUsersDetail(String adminName);
 
-    List<UserDto> getAllUserDetailWithSort(String adminName, String field, String direction);
+    List<UserDto> getAllUsersDetailWithSortAndPaging(String adminName, int pageNo, int pageSize, String sortField, String direction);
+
+    List<UserDto> searchAllUsersByNameWithSortAndPaging(String adminName, String username,int pageNo, int pageSize, String sortField, String direction);
 
     String deleteUser(String adminName, String adminPassword, Long userId);
 

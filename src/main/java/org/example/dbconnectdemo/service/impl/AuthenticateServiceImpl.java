@@ -1,12 +1,14 @@
 package org.example.dbconnectdemo.service.impl;
 
 import lombok.AllArgsConstructor;
+import org.example.dbconnectdemo.dto.RegisterBody;
 import org.example.dbconnectdemo.dto.UserDto;
 import org.example.dbconnectdemo.exception.InvalidInputException;
 import org.example.dbconnectdemo.model.Role;
 import org.example.dbconnectdemo.repository.UserRepository;
 import org.example.dbconnectdemo.service.AuthenticateService;
 import org.example.dbconnectdemo.service.UserService;
+import org.example.dbconnectdemo.service.Utility;
 import org.example.dbconnectdemo.spring_security.JwtUlti;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,7 +28,18 @@ public class AuthenticateServiceImpl implements AuthenticateService {
     private final UserRepository userRepository;
 
     @Override
-    public void register(UserDto userDto) {
+    public void register(RegisterBody registerBody) {
+        String combineParam = registerBody.getUsername() + "|"+ registerBody.getEmail() +"|"+ registerBody.getPassword() +"|" + Utility.FRONTEND_ID_KEY;
+
+        String checkSum = Utility.sha256(combineParam);
+
+        if(!registerBody.getCheckSum().equals(checkSum)){
+            throw new RuntimeException("Invalid Frontend key");
+        }
+        UserDto userDto = new UserDto();
+        userDto.setUsername(registerBody.getUsername());
+        userDto.setEmail(registerBody.getEmail());
+        userDto.setPassword(registerBody.getPassword());
         userDto.setRole(Role.USER); //Hardcode every created account is user
         userService.createUser(userDto);
     }

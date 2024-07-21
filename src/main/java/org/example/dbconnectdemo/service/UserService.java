@@ -10,6 +10,8 @@ import org.jaudiotagger.audio.exceptions.CannotReadException;
 import org.jaudiotagger.audio.exceptions.InvalidAudioFrameException;
 import org.jaudiotagger.audio.exceptions.ReadOnlyFileException;
 import org.jaudiotagger.tag.TagException;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
@@ -25,8 +27,11 @@ public interface UserService{
 
     List<SongDto> getAllUserSongsWithSortAndPaging(String username,int pageNo,int pageSize, String field, String direction);
 
-    List<SongDto> searchAllUserSongsLikeNameWithPaging(String username,int pageNo,int pageSize, String name);
+    List<SongDto> searchAllUserSongsLikeNameWithSortAndPaging(String username,int pageNo,int pageSize,String sortField, String direction, String name);
 
+    List<SongDto> searchAllUserSongsLikeArtistWithSortAndPaging(String username,int pageNo,int pageSize,String sortField, String direction, String name);
+
+    //legacy method
     List<SongDto> searchAllUserSongsLikeName(String username, String name);
 
     Song getUserSong(String username, Long songId);
@@ -35,8 +40,11 @@ public interface UserService{
 
     List<SongDto> getAllUserFavoriteSongsWithSortAndPaging(String username,int pageNo,int pageSize, String field, String direction);
 
-    List<SongDto> searchAllUserFavoriteSongsLikeNameWithPaging(String username, int pageNo, int pageSize, String name);
+    List<SongDto> searchAllUserFavoriteSongsLikeNameWithSortAndPaging(String username, int pageNo, int pageSize,String sortField, String direction, String name);
 
+    List<SongDto> searchAllUserFavoriteSongsLikeArtistWithSortAndPaging(String username, int pageNo, int pageSize,String sortField, String direction, String name);
+
+    //legacy method
     List<SongDto> searchAllUserFavoriteSongsLikeName(String username, String name);
 
     SongDto updateUserFavoriteSong(String username, Long songId, boolean isFavorite);
